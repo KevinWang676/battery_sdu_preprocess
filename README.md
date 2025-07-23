@@ -1,6 +1,6 @@
 # SDU Battery Data Preprocessor 
 
-This preprocessor script (`process_scripts/preprocess_SDU.py`) processes battery charge/discharge cycle data from SDU files into the same format as the CALCE preprocessor. It follows the exact same preprocessing logic and produces compatible `BatteryData` objects.
+This preprocessor script (`preprocess_SDU.py`) processes battery charge/discharge cycle data from SDU files into the same format as the CALCE preprocessor. It follows the exact same preprocessing logic and produces compatible `BatteryData` objects.
 
 ## Compared to preprocess_CALCE.py
 
@@ -143,7 +143,7 @@ elif not is_charge and I[i] < 0:
 
 ### Basic Usage
 ```python
-from process_scripts.preprocess_SDU import SDUPreprocessor
+from preprocess_SDU import SDUPreprocessor
 
 # Initialize preprocessor
 preprocessor = SDUPreprocessor(
