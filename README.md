@@ -2,6 +2,84 @@
 
 This preprocessor script (`process_scripts/preprocess_CSV.py`) processes battery charge/discharge cycle data from CSV files into the same format as the CALCE preprocessor. It follows the exact same preprocessing logic and produces compatible `BatteryData` objects.
 
+## Compared to preprocess_CALCE.py
+
+### ✅ **Identical Processing Steps**
+
+1. **Capacity Calculation**: Both use identical `calc_Q()` function to calculate charge/discharge capacity from current and time data (correctly ignoring pre-existing capacity columns)
+
+2. **Cycle Organization**: Both use identical `organize_cycle_index()` function
+
+3. **Data Extraction**: Both extract the same core columns: `['date', 'Cycle_Index', 'Test_Time(s)', 'Current(A)', 'Voltage(V)']`
+
+4. **CycleData Creation**: Identical structure and parameters
+
+5. **Outlier Detection Logic**: Same threshold calculation (`3 * median(|Qd - Qd_median|)`) and filtering criteria (`Qd > 0.1`)
+
+### 🔄 **Necessary Adaptations for Different Data Structure**
+
+1. **Data Loading**: 
+   - CALCE: ZIP files → multiple files per cell → concatenation
+   - CSV: Single CSV files → grouping by Battery_ID
+
+2. **Date Handling**:
+   - CALCE: Extracts dates from filenames
+   - CSV: Uses dummy date (appropriate since CSV data lacks timestamps)
+
+3. **Sorting**:
+   - CALCE: `['date', 'Test_Time(s)']`
+   - CSV: `['Test_Time(s)']` (date is constant)
+
+### ⚠️ **Important Differences Found**
+
+#### 1. **Median Filter Window (CSV is Better)**
+```python
+# CALCE (potential bug)
+Qd_med = medfilt(Qd, 21)  # Fails if <21 cycles
+
+# CSV (improved)
+if len(Qd) >= 21:
+    Qd_med = medfilt(Qd, 21)
+else:
+    Qd_med = medfilt(Qd, min(len(Qd), 5))
+```
+
+**Issue**: CALCE's approach breaks when batteries have <21 cycles (zero-pads the result), while CSV handles this correctly.
+
+#### 2. **Nominal Capacity Estimation**
+```python
+# CALCE (hardcoded)
+C = 1.1 if 'CS' in cell.upper() else 1.35
+
+# CSV (data-driven)
+initial_capacities = [max(cycle.discharge_capacity_in_Ah) for cycle in clean_cycles[:5]]
+C = np.mean(initial_capacities) if initial_capacities else 1.0
+```
+
+**Difference**: CALCE uses domain knowledge for specific cell types, CSV estimates from data. Both approaches are valid.
+
+#### 3. **Safety Checks (CSV is More Robust)**
+```python
+# CSV adds defensive programming
+if len(cycle_data.discharge_capacity_in_Ah) > 0:
+    Qd.append(max(cycle_data.discharge_capacity_in_Ah))
+else:
+    Qd.append(0.0)
+```
+
+## Skipped Batteries
+
+⚠️ Expected Skips
+3 batteries (73, 74, 75) had no clean cycles after filtering - this is normal for some battery datasets with insufficient or corrupted data
+
+🔍 The Problem: Median Filter Edge Case
+All three batteries have the same critical issue:
+Excellent discharge capacities (~2.44 to 1.92 Ah over 1000+ cycles)
+Very gradual, monotonic capacity decay (smooth degradation curve)
+21-point median filter makes consecutive values identical
+Median threshold = 0.000000 (because all filtered values are the same)
+ANY deviation from the median (even tiny floating-point differences) gets filtered as "outlier"
+
 ## Input Data Format
 
 The preprocessor expects CSV files with the following columns:
