@@ -73,12 +73,12 @@ else:
 3 batteries (73, 74, 75) had no clean cycles after filtering - this is normal for some battery datasets with insufficient or corrupted data
 
 🔍 The Problem: Median Filter Edge Case
-All three batteries have the same critical issue:
-Excellent discharge capacities (~2.44 to 1.92 Ah over 1000+ cycles)
-Very gradual, monotonic capacity decay (smooth degradation curve)
-21-point median filter makes consecutive values identical
-Median threshold = 0.000000 (because all filtered values are the same)
-ANY deviation from the median (even tiny floating-point differences) gets filtered as "outlier"
+- All three batteries have the same critical issue:
+- Excellent discharge capacities (~2.44 to 1.92 Ah over 1000+ cycles)
+- Very gradual, monotonic capacity decay (smooth degradation curve)
+- 21-point median filter makes consecutive values identical
+- Median threshold = 0.000000 (because all filtered values are the same)
+- ANY deviation from the median (even tiny floating-point differences) gets filtered as "outlier"
 
 ## Input Data Format
 
