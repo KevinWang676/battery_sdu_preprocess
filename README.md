@@ -1,6 +1,6 @@
-# CSV Battery Data Preprocessor
+# SDU Battery Data Preprocessor 
 
-This preprocessor script (`process_scripts/preprocess_CSV.py`) processes battery charge/discharge cycle data from CSV files into the same format as the CALCE preprocessor. It follows the exact same preprocessing logic and produces compatible `BatteryData` objects.
+This preprocessor script (`process_scripts/preprocess_SDU.py`) processes battery charge/discharge cycle data from SDU files into the same format as the CALCE preprocessor. It follows the exact same preprocessing logic and produces compatible `BatteryData` objects.
 
 ## Compared to preprocess_CALCE.py
 
@@ -20,47 +20,47 @@ This preprocessor script (`process_scripts/preprocess_CSV.py`) processes battery
 
 1. **Data Loading**: 
    - CALCE: ZIP files → multiple files per cell → concatenation
-   - CSV: Single CSV files → grouping by Battery_ID
+   - SDU: Single SDU files → grouping by Battery_ID
 
 2. **Date Handling**:
    - CALCE: Extracts dates from filenames
-   - CSV: Uses dummy date (appropriate since CSV data lacks timestamps)
+   - SDU: Uses dummy date (appropriate since SDU data lacks timestamps)
 
 3. **Sorting**:
    - CALCE: `['date', 'Test_Time(s)']`
-   - CSV: `['Test_Time(s)']` (date is constant)
+   - SDU: `['Test_Time(s)']` (date is constant)
 
 ### ⚠️ **Important Differences Found**
 
-#### 1. **Median Filter Window (CSV is Better)**
+#### 1. **Median Filter Window (SDU is Better)**
 ```python
 # CALCE (potential bug)
 Qd_med = medfilt(Qd, 21)  # Fails if <21 cycles
 
-# CSV (improved)
+# SDU (improved)
 if len(Qd) >= 21:
     Qd_med = medfilt(Qd, 21)
 else:
     Qd_med = medfilt(Qd, min(len(Qd), 5))
 ```
 
-**Issue**: CALCE's approach breaks when batteries have <21 cycles (zero-pads the result), while CSV handles this correctly.
+**Issue**: CALCE's approach breaks when batteries have <21 cycles (zero-pads the result), while SDU handles this correctly.
 
 #### 2. **Nominal Capacity Estimation**
 ```python
 # CALCE (hardcoded)
 C = 1.1 if 'CS' in cell.upper() else 1.35
 
-# CSV (data-driven)
+# SDU (data-driven)
 initial_capacities = [max(cycle.discharge_capacity_in_Ah) for cycle in clean_cycles[:5]]
 C = np.mean(initial_capacities) if initial_capacities else 1.0
 ```
 
-**Difference**: CALCE uses domain knowledge for specific cell types, CSV estimates from data. Both approaches are valid.
+**Difference**: CALCE uses domain knowledge for specific cell types, SDU estimates from data. Both approaches are valid.
 
-#### 3. **Safety Checks (CSV is More Robust)**
+#### 3. **Safety Checks (SDU is More Robust)**
 ```python
-# CSV adds defensive programming
+# SDU adds defensive programming
 if len(cycle_data.discharge_capacity_in_Ah) > 0:
     Qd.append(max(cycle_data.discharge_capacity_in_Ah))
 else:
@@ -82,7 +82,7 @@ else:
 
 ## Input Data Format
 
-The preprocessor expects CSV files with the following columns:
+The preprocessor expects SDU files with the following columns:
 
 | Column Name | Description |
 |-------------|-------------|
@@ -112,7 +112,7 @@ The preprocessor expects CSV files with the following columns:
 
 ### Processing Steps
 1. **File Discovery**: Finds all `*.csv` files in the specified directory
-2. **Data Loading**: Loads CSV files and groups by `Battery_ID`
+2. **Data Loading**: Loads SDU files and groups by `Battery_ID`
 3. **Data Sorting**: Sorts by `Test_Time(s)` (equivalent to CALCE's date+time sorting)
 4. **Cycle Organization**: Renumbers cycles consecutively using `organize_cycle_index()`
 5. **Capacity Calculation**: Calculates charge/discharge capacities from current and time
@@ -143,34 +143,27 @@ elif not is_charge and I[i] < 0:
 
 ### Basic Usage
 ```python
-from process_scripts.preprocess_CSV import CSVPreprocessor
+from process_scripts.preprocess_SDU import SDUPreprocessor
 
 # Initialize preprocessor
-preprocessor = CSVPreprocessor(
+preprocessor = SDUPreprocessor(
     dump_dir='./processed_data',  # Output directory
     silent=False  # Show progress messages
 )
 
-# Process CSV files
+# Process SDU files
 processed_count, skipped_count = preprocessor.process(
-    parentdir='./data'  # Directory containing CSV files
+    parentdir='./data'  # Directory containing SDU files
 )
 
 print(f"Processed {processed_count} batteries, skipped {skipped_count}")
 ```
 
-### Using the Test Script
-```bash
-python test_csv_preprocessor.py
-```
-
-This will process any CSV files in the current directory and save the results to `./processed_data/`.
-
 ## Output Format
 
 The preprocessor creates `BatteryData` objects with:
 
-- **Cell ID**: `CSV_Battery_{Battery_ID}` (e.g., "CSV_Battery_43")
+- **Cell ID**: `SDU_Battery_{Battery_ID}` (e.g., "SDU_Battery_43")
 - **Cycle Data**: List of `CycleData` objects containing:
   - `voltage_in_V`: Voltage measurements
   - `current_in_A`: Current measurements  
@@ -200,32 +193,18 @@ battery = BatteryData(
 
 While maintaining identical processing logic, this preprocessor differs in:
 
-1. **Input Format**: Reads CSV files instead of ZIP archives
+1. **Input Format**: Reads SDU files instead of ZIP archives
 2. **Data Source**: Uses `Battery_ID` for grouping instead of filename-based dates
-3. **Date Handling**: Uses dummy dates since CSV data doesn't include timestamps
+3. **Date Handling**: Uses dummy dates since SDU data doesn't include timestamps
 4. **Metadata**: Uses generic battery specifications (can be customized)
 
 ## Error Handling
 
 The preprocessor includes robust error handling:
-- Skips corrupted CSV files with error messages
+- Skips corrupted SDU files with error messages
 - Handles empty or invalid data gracefully
 - Validates that cycles contain sufficient data
 - Uses smaller median filter windows for short cycle sequences
-
-## File Structure
-
-```
-├── process_scripts/
-│   └── preprocess_CSV.py          # Main preprocessor script
-├── test_csv_preprocessor.py       # Test/example script
-├── CSV_PREPROCESSOR_README.md     # This documentation
-├── 71.csv                         # Example input data (Battery_ID=43)
-├── 72.csv                         # Example input data (Battery_ID=44)
-└── processed_data/                # Output directory (created automatically)
-    ├── CSV_Battery_43.pkl         # Processed battery 43 data
-    └── CSV_Battery_44.pkl         # Processed battery 44 data
-```
 
 ## Integration with BatteryML
 
